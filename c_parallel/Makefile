@@ -1,15 +1,9 @@
-EXECS = sieve_0 sieve_1 sieve_2
+EXECS = my_pblas
 
 all: $(EXECS)
 
-sieve_0: sieve_0.c
-	mpicc -o sieve_0 sieve_0.c
-
-sieve_1: sieve_1.c
-	mpicc -o sieve_1 sieve_1.c
-
-sieve_2: sieve_2.c
-	mpicc -o sieve_2 sieve_2.c
+my_pblas: my_pblas.c
+	mpicc -o my_pblas my_pblas.c
 
 clean:
 	rm $(EXECS)
