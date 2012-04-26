@@ -1,0 +1,135 @@
+Four basic steps are required to call a ScaLAPACK routine.
+
+Initialize the process grid
+Distribute the matrix on the process grid
+Call ScaLAPACK routine
+Release the process grid
+Each of these steps is detailed below. The example program in section 2.3 illustrates these basic requirements. Refer to section 2.3.2 for an explanation of notational variables.
+
+For more information on the BLACS routines called in this program, and more specifically their calling sequences, please refer to Appendix D.3, [54], and the BLACS homepage  
+(http://www.netlib.org/blacs/index.html). Further details of the matrix distribution and storage scheme can be found in Chapter 4 and section 4.3.2.
+
+The PBLAS operate on matrices distributed in a 2D block cyclic layout. Since such a data layout requires many parameters to fully describe the distributed matrix, we have chosen a more object-oriented approach, and encapsulated these parameters in an integer array called an array descriptor. An array descriptor includes
+
+(1) the number of rows in the distributed matrix, 
+(2) the number of columns in the distributed matrix, 
+(3) the row block size ( in section 2.5), 
+(4) the column block size ( in section 2.5), 
+(5) the process row over which the first row of the matrix is distributed, 
+(6) the process column over which the first column of the matrix is distributed, 
+(7) the BLACS context, and 
+(8) the leading dimension of the local array storing the local blocks.
+For example, here is an example of a call to the BLAS double precision matrix multiplication routine DGEMM, and the corresponding PBLAS routine PDGEMM; note how similar they are:
+
+      CALL DGEMM ( TRANSA, TRANSB, M, N, K, ALPHA, 
+                                            A( IA, JA ), LDA, 
+                                            B( IB, JB ), LDB, BETA, 
+                                            C( IC, JC ), LDC )
+
+      CALL PDGEMM( TRANSA, TRANSB, M, N, K, ALPHA, 
+                                            A, IA, JA, DESC_A, 
+                                            B, IB, JB, DESC_B, BETA, 
+                                            C, IC, JC, DESC_C )
+DGEMM computes C = BETA * C + ALPHA * op( A ) * op( B ), where op(A) is either A or its transpose depending on TRANSA, op(B) is similar, op(A) is M-by-K, and op(B) is K-by-N. PDGEMM is the same, with the exception of the way in which submatrices are specified. To pass the submatrix starting at A(IA,JA) to DGEMM, for example, the actual argument corresponding to the formal argument A would simply be A(IA,JA). PDGEMM, on the other hand, needs to understand the global storage scheme of A to extract the correct submatrix, so IA and JA must be passed in separately. DESC_A is the array descriptor for A. The parameters describing the matrix operands B and C are analogous to those describing A. In a truly object-oriented environment matrices and DESC_A would be the synonymous. However, this would require language support, and detract from portability.
+
+
+
+PvGEMV
+
+SUBROUTINE PvGEMV( TRANS, M, N, ALPHA, A, IA, JA, DESCA, X, IX, JX, DESCX, INCX, BETA, Y, IY, JY, DESCY, INCY )
+Purpose
+
+PvGEMV performs one of the distributed matrix-vector operations
+
+sub( Y ) := alpha*sub( A ) * sub( X ) + beta*sub( Y ), or
+sub( Y ) := alpha*sub( A )' * sub( X ) + beta*sub( Y ),
+where sub( A ) denotes A(IA:IA+M-1,JA:JA+N-1),
+
+      sub( X ) denotes if TRANS = 'N',
+                     X(IX:IX,JX:JX+N-1), if INCX = M_X,
+                     X(IX:IX+N-1,JX:JX), if INCX = 1 and INCX <> M_X,
+                   else
+                     X(IX:IX,JX:JX+M-1), if INCX = M_X,
+                     X(IX:IX+M-1,JX:JX), if INCX = 1 and INCX <> M_X,
+                   end if
+      sub( Y ) denotes if trans = 'N',
+                     Y(IY:IY,JY:JY+M-1), if INCY = M_Y,
+                     Y(IY:IY+M-1,JY:JY), if INCY = 1 and INCY <> M_Y,
+                   else
+                     Y(IY:IY,JY:JY+N-1), if INCY = M_Y,
+                     Y(IY:IY+N-1,JY:JY), if INCY = 1 and INCY <> M_Y,
+                   end if
+alpha and beta are scalars, and sub( X ) and sub( Y ) are distributed vectors and sub( A ) is a M-by-N distributed submatrix.
+Arguments
+
+TRANS
+(global input) CHARACTER 
+On entry, TRANS specifies the operation to be performed as follows:
+if TRANS = 'N',
+sub( Y ) := alpha*sub( A ) * sub( X ) + beta*sub( Y ),
+else if TRANS = 'T',
+sub( Y ) := alpha*sub( A )' * sub( X ) + beta*sub( Y ),
+else if TRANS = 'C',
+sub( Y ) := alpha*sub( A )' * sub( X ) + beta*sub( Y ).
+M
+(global input) INTEGER 
+The number of rows to be operated on i.e the number of rows of the distributed submatrix sub( A ). M >= 0.
+N
+(global input) INTEGER 
+The number of columns to be operated on i.e the number of columns of the distributed submatrix sub( A ). N >= 0.
+ALPHA
+(global input) REAL/COMPLEX 
+On entry, ALPHA specifies the scalar alpha.
+A
+(local input) array of dimension (LLD_A, LOCq(JA+N-1))
+This array contains the local pieces of the distributed matrix sub( A ).
+IA
+(global input) INTEGER 
+The global row index of the submatrix of the distributed matrix A to operate on.
+JA
+(global input) INTEGER 
+The global column index of the submatrix of the distributed matrix A to operate on.
+DESCA
+(global and local input) INTEGER array of dimension 8
+The array descriptor of the distributed matrix A.
+X
+(local input/local output) array of dimension at least
+if TRANS = 'N',
+( (JX-1)*M_X + IX + ( N - 1 )*abs( INCX ) )
+else
+( (JX-1)*M_X + IX + ( M - 1 )*abs( INCX ) )
+This array contains the entries of the distributed vector sub( X ).
+IX
+(global input) INTEGER 
+The global row index of the submatrix of the distributed matrix X to operate on.
+JX
+(global input) INTEGER 
+The global column index of the submatrix of the distributed matrix X to operate on.
+DESCX
+(global and local input) INTEGER array of dimension 8
+The array descriptor of the distributed matrix X.
+INCX
+(global input) INTEGER 
+The global increment for the elements of X. Only two values of INCX are supported in this version, namely 1 and M_X.
+BETA
+(global input) REAL/COMPLEX 
+On entry, BETA specifies the scalar beta. When BETA is supplied as zero then sub( Y ) need not be set on input.
+Y
+(local input/local output) array of dimension at least 
+if TRANS = 'N',
+( (JY-1)*M_Y + IY + ( M - 1 )*abs( INCY ) )
+else
+( (JY-1)*M_Y + IY + ( N - 1 )*abs( INCY ) )
+This array contains the entries of the distributed vector sub( Y ). On exit, sub( Y ) is overwritten by the updated distributed vector sub( Y ).
+IY
+(global input) INTEGER 
+The global row index of the submatrix of the distributed matrix Y to operate on.
+JY
+(global input) INTEGER 
+The global column index of the submatrix of the distributed matrix Y to operate on.
+DESCY
+(global and local input) INTEGER array of dimension 8
+The array descriptor of the distributed matrix Y.
+INCY
+(global input) INTEGER 
+The global increment for the elements of Y. Only two values of INCY are supported in this version, namely 1 and M_Y.
